@@ -7,28 +7,60 @@ class TimeConvertApp:
     def __init__(self, root):
         self.root = root
         self.root.title("TimeConvert")
-        self.root.geometry("500x400")
+        self.root.geometry("650x350")  # 调整为更合理的宽高比例
         self.root.resizable(True, True)
         
-        # 设置主题样式
+        # 设置主题样式，优化字体和视觉效果
         self.style = ttk.Style()
-        self.style.configure("TLabel", font=(".", 10))
-        self.style.configure("TButton", font=(".", 10))
+        # 设置现代风格
+        self.style.theme_use("clam")
+        # 调整字体大小和样式，优化视觉层次
+        self.style.configure("TLabel", font=(".", 11))
+        self.style.configure("TButton", font=(".", 11), padding=5)
+        self.style.configure("TCombobox", font=(".", 11), padding=3)
+        self.style.configure("TEntry", font=(".", 11), padding=3)
+        self.style.configure("TLabelFrame.Label", font=(".", 12, "bold"))
+        # 优化按钮样式
+        self.style.configure("TButton", relief=tk.FLAT, borderwidth=1)
+        self.style.map("TButton", 
+                      background=[("active", "#e0e0e0"), ("!active", "#f0f0f0")],
+                      foreground=[("active", "#000000"), ("!active", "#333333")])
         
-        # 创建主框架
+        # 使用grid布局管理器，设置列和行的权重，实现自动适应
+        root.grid_rowconfigure(0, weight=1)
+        root.grid_columnconfigure(0, weight=1)
+        
+        # 创建主框架，调整内边距为更合理的值
         self.main_frame = ttk.Frame(root, padding="20")
-        self.main_frame.pack(fill=tk.BOTH, expand=True)
+        self.main_frame.grid(row=0, column=0, sticky="nsew")
+        
+        # 设置主框架的列权重，确保宽度自适应
+        self.main_frame.grid_columnconfigure(0, weight=1)
         
         # 输入区域
-        self.input_label = ttk.Label(self.main_frame, text="输入时间/日期:")
-        self.input_label.pack(anchor="w", pady=(0, 5))
+        self.input_frame = ttk.Frame(self.main_frame)
+        self.input_frame.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        self.input_frame.grid_columnconfigure(0, weight=1)
         
-        self.input_text = tk.Text(self.main_frame, height=5, wrap=tk.WORD)
-        self.input_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.input_label = ttk.Label(self.input_frame, text="输入时间/日期:")
+        self.input_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
+        
+        # 调整输入框高度为1行，配合合适的间距
+        self.input_text = tk.Text(self.input_frame, height=1, wrap=tk.WORD, font=(".", 11))
+        self.input_text.grid(row=1, column=0, sticky="ew", padx=(0, 10))
+        # 增加适中的上下间距
+        self.input_text.config(spacing1=8, spacing3=8)
+        
+        # 粘贴按钮，位于输入框右侧
+        self.paste_button = ttk.Button(self.input_frame, text="粘贴", command=self.paste_from_clipboard, width=8)
+        self.paste_button.grid(row=1, column=1, sticky="ew", pady=(0, 0))
         
         # 格式区域
         self.format_frame = ttk.LabelFrame(self.main_frame, text="目标格式")
-        self.format_frame.pack(fill=tk.X, pady=(0, 10), padx=(0, 0))
+        self.format_frame.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+        
+        # 设置格式框架的行列权重
+        self.format_frame.grid_columnconfigure(0, weight=1)
         
         # 预设格式列表
         self.preset_formats = {
@@ -49,22 +81,22 @@ class TimeConvertApp:
         self.preset_var = tk.StringVar(value="YYYY-MM-DD HH:MM:SS")
         self.preset_combo = ttk.Combobox(self.format_frame, textvariable=self.preset_var, 
                                          values=list(self.preset_formats.keys()), state="readonly")
-        self.preset_combo.pack(fill=tk.X, pady=(5, 5))
+        self.preset_combo.grid(row=0, column=0, sticky="ew", pady=(10, 8), padx=10)
         self.preset_combo.bind("<<ComboboxSelected>>", self.on_preset_selected)
         
         # 自定义格式输入
         self.custom_format_label = ttk.Label(self.format_frame, text="或自定义格式:")
-        self.custom_format_label.pack(anchor="w", pady=(5, 0))
+        self.custom_format_label.grid(row=1, column=0, sticky="w", pady=(0, 5), padx=10)
         
         self.format_var = tk.StringVar(value=self.preset_formats["YYYY-MM-DD HH:MM:SS"])
-        self.format_entry = ttk.Entry(self.format_frame, textvariable=self.format_var)
-        self.format_entry.pack(fill=tk.X, pady=(0, 5))
+        self.format_entry = ttk.Entry(self.format_frame, textvariable=self.format_var, font=(".", 11))
+        self.format_entry.grid(row=2, column=0, sticky="ew", pady=(0, 8), padx=10)
         
         # 格式说明
         self.format_help = ttk.Label(self.format_frame, 
                                     text="格式说明: %Y(年), %m(月), %d(日), %H(时), %M(分), %S(秒)",
-                                    font=(".", 8), foreground="gray")
-        self.format_help.pack(anchor="w")
+                                    font=(".", 9), foreground="#666666")
+        self.format_help.grid(row=3, column=0, sticky="w", pady=(0, 10), padx=10)
         
         # 实时转换 - 绑定输入和格式变化事件
         self.input_text.bind("<KeyRelease>", self.convert_time)
@@ -72,27 +104,24 @@ class TimeConvertApp:
         self.preset_combo.bind("<<ComboboxSelected>>", lambda event: self.convert_time())
         
         # 输出区域
-        self.output_label = ttk.Label(self.main_frame, text="转换结果:")
-        self.output_label.pack(anchor="w", pady=(0, 5))
-        
         self.output_frame = ttk.Frame(self.main_frame)
-        self.output_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.output_frame.grid(row=2, column=0, sticky="ew", pady=(0, 20))
+        self.output_frame.grid_columnconfigure(0, weight=1)
         
-        self.output_text = tk.Text(self.output_frame, height=5, wrap=tk.WORD)
-        self.output_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        self.output_label = ttk.Label(self.output_frame, text="转换结果:")
+        self.output_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
         
+        # 调整输出框高度为1行，配合合适的间距
+        self.output_text = tk.Text(self.output_frame, height=1, wrap=tk.WORD, font=(".", 11))
+        self.output_text.grid(row=1, column=0, sticky="ew", padx=(0, 10))
+        # 增加适中的上下间距
+        self.output_text.config(spacing1=8, spacing3=8)
+        
+        # 复制按钮，位于输出框右侧
         self.output_copy_button = ttk.Button(self.output_frame, text="复制", command=self.copy_to_clipboard, width=8)
-        self.output_copy_button.pack(side=tk.RIGHT, fill=tk.Y)
+        self.output_copy_button.grid(row=1, column=1, sticky="ew", pady=(0, 0))
         
-        # 按钮区域
-        self.button_frame = ttk.Frame(self.main_frame)
-        self.button_frame.pack(fill=tk.X)
-        
-        self.paste_button = ttk.Button(self.button_frame, text="粘贴", command=self.paste_from_clipboard)
-        self.paste_button.pack(side=tk.LEFT, padx=(0, 10), fill=tk.X, expand=True)
-        
-        self.copy_button = ttk.Button(self.button_frame, text="复制", command=self.copy_to_clipboard)
-        self.copy_button.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        # 移除底部按钮区域，粘贴和复制按钮已分别移至输入框和输出框右侧
     
     def paste_from_clipboard(self):
         """从剪贴板粘贴内容到输入框"""
