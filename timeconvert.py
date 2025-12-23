@@ -66,16 +66,23 @@ class TimeConvertApp:
                                     font=(".", 8), foreground="gray")
         self.format_help.pack(anchor="w")
         
-        # 转换按钮
-        self.convert_button = ttk.Button(self.main_frame, text="转换", command=self.convert_time)
-        self.convert_button.pack(fill=tk.X, pady=(0, 10))
+        # 实时转换 - 绑定输入和格式变化事件
+        self.input_text.bind("<KeyRelease>", self.convert_time)
+        self.format_entry.bind("<KeyRelease>", self.convert_time)
+        self.preset_combo.bind("<<ComboboxSelected>>", lambda event: self.convert_time())
         
         # 输出区域
         self.output_label = ttk.Label(self.main_frame, text="转换结果:")
         self.output_label.pack(anchor="w", pady=(0, 5))
         
-        self.output_text = tk.Text(self.main_frame, height=5, wrap=tk.WORD)
-        self.output_text.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.output_frame = ttk.Frame(self.main_frame)
+        self.output_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        
+        self.output_text = tk.Text(self.output_frame, height=5, wrap=tk.WORD)
+        self.output_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        
+        self.output_copy_button = ttk.Button(self.output_frame, text="复制", command=self.copy_to_clipboard, width=8)
+        self.output_copy_button.pack(side=tk.RIGHT, fill=tk.Y)
         
         # 按钮区域
         self.button_frame = ttk.Frame(self.main_frame)
@@ -109,25 +116,21 @@ class TimeConvertApp:
             if output_content:
                 self.root.clipboard_clear()
                 self.root.clipboard_append(output_content)
-                messagebox.showinfo("成功", "已复制到剪贴板")
-            else:
-                messagebox.showwarning("警告", "没有可复制的内容")
+            # 无声复制，不显示弹窗
         except Exception as e:
-            messagebox.showerror("错误", f"复制失败: {str(e)}")
+            pass
     
-    def convert_time(self):
+    def convert_time(self, event=None):
         """转换时间格式"""
         try:
             # 获取输入内容和目标格式
             input_content = self.input_text.get(1.0, tk.END).strip()
             target_format = self.format_var.get()
             
-            if not input_content:
-                messagebox.showwarning("警告", "请输入时间/日期")
-                return
+            # 清除之前的结果
+            self.output_text.delete(1.0, tk.END)
             
-            if not target_format:
-                messagebox.showwarning("警告", "请输入目标格式")
+            if not input_content or not target_format:
                 return
             
             # 解析时间
@@ -136,12 +139,9 @@ class TimeConvertApp:
                 # 转换为目标格式
                 converted_time = dt.strftime(target_format)
                 # 显示结果
-                self.output_text.delete(1.0, tk.END)
                 self.output_text.insert(tk.END, converted_time)
-            else:
-                messagebox.showerror("错误", "无法解析输入的时间格式")
         except Exception as e:
-            messagebox.showerror("错误", f"转换失败: {str(e)}")
+            pass
     
     def parse_time(self, time_str):
         """解析各种时间格式"""
