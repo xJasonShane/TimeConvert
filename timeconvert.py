@@ -45,13 +45,23 @@ class TimeConvertApp:
         self.input_label = ttk.Label(self.input_frame, text="输入时间/日期:")
         self.input_label.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 5))
         
+        # 使用StringVar来存储输入内容，便于使用trace机制监测变化
+        self.input_var = tk.StringVar()
+        
         # 调整输入框高度为1行，配合合适的间距
         self.input_text = tk.Text(self.input_frame, height=1, wrap=tk.WORD, font=(".", 11))
         self.input_text.grid(row=1, column=0, sticky="ew", padx=(0, 10))
         # 增加适中的上下间距
         self.input_text.config(spacing1=8, spacing3=8)
         
-        # 粘贴按钮，位于输入框右侧
+        # 初始化置顶状态
+        self.is_on_top = False
+        
+        # 置顶按钮，位于粘贴按钮正上方，使用网格布局精确控制位置
+        self.topmost_button = ttk.Button(self.input_frame, text="置顶", command=self.toggle_topmost, width=8)
+        self.topmost_button.grid(row=0, column=1, sticky="ew", pady=(0, 5))
+        
+        # 粘贴按钮，位于输入框右侧，与输入框保持水平对齐
         self.paste_button = ttk.Button(self.input_frame, text="粘贴", command=self.paste_from_clipboard, width=8)
         self.paste_button.grid(row=1, column=1, sticky="ew", pady=(0, 0))
         
@@ -98,10 +108,18 @@ class TimeConvertApp:
                                     font=(".", 9), foreground="#666666")
         self.format_help.grid(row=3, column=0, sticky="w", pady=(0, 10), padx=10)
         
-        # 实时转换 - 绑定输入和格式变化事件
-        self.input_text.bind("<KeyRelease>", self.convert_time)
-        self.format_entry.bind("<KeyRelease>", self.convert_time)
-        self.preset_combo.bind("<<ComboboxSelected>>", lambda event: self.convert_time())
+        # 使用trace机制监测输入变化，确保实时转换
+        self.input_var.trace("w", self.on_input_change)
+        self.format_var.trace("w", self.on_input_change)
+        
+        # 同时保留键盘事件绑定，确保兼容性
+        self.input_text.bind("<KeyRelease>", self.on_input_key_release)
+        self.input_text.bind("<KeyPress>", self.on_input_key_release)
+        self.input_text.bind("<FocusOut>", self.on_input_key_release)
+        self.format_entry.bind("<KeyRelease>", self.on_input_key_release)
+        self.format_entry.bind("<KeyPress>", self.on_input_key_release)
+        self.format_entry.bind("<FocusOut>", self.on_input_key_release)
+        self.preset_combo.bind("<<ComboboxSelected>>", self.on_preset_selected)
         
         # 输出区域
         self.output_frame = ttk.Frame(self.main_frame)
@@ -121,7 +139,12 @@ class TimeConvertApp:
         self.output_copy_button = ttk.Button(self.output_frame, text="复制", command=self.copy_to_clipboard, width=8)
         self.output_copy_button.grid(row=1, column=1, sticky="ew", pady=(0, 0))
         
-        # 移除底部按钮区域，粘贴和复制按钮已分别移至输入框和输出框右侧
+        # 添加初始化测试数据，便于验证程序是否正常工作
+        self.input_text.insert(tk.END, "2023-04-15 14:30:25")
+        # 更新StringVar的值
+        self.input_var.set("2023-04-15 14:30:25")
+        # 触发一次转换
+        self.convert_time()
     
     def paste_from_clipboard(self):
         """从剪贴板粘贴内容到输入框"""
@@ -129,6 +152,8 @@ class TimeConvertApp:
             clipboard_content = self.root.clipboard_get()
             self.input_text.delete(1.0, tk.END)
             self.input_text.insert(tk.END, clipboard_content)
+            # 更新StringVar的值
+            self.input_var.set(clipboard_content)
         except Exception as e:
             messagebox.showerror("错误", f"粘贴失败: {str(e)}")
     
@@ -149,19 +174,41 @@ class TimeConvertApp:
         except Exception as e:
             pass
     
+    def toggle_topmost(self):
+        """切换窗口置顶状态"""
+        self.is_on_top = not self.is_on_top
+        self.root.attributes("-topmost", self.is_on_top)
+        # 更新按钮文本，显示当前状态
+        if self.is_on_top:
+            self.topmost_button.config(text="取消置顶")
+        else:
+            self.topmost_button.config(text="置顶")
+    
+    def on_input_key_release(self, event):
+        """处理输入框键盘事件，更新StringVar的值"""
+        # 获取当前输入框内容
+        input_content = self.input_text.get(1.0, tk.END).strip()
+        # 更新StringVar的值，这会触发trace机制
+        self.input_var.set(input_content)
+    
+    def on_input_change(self, *args):
+        """处理输入内容变化，触发转换"""
+        # 触发转换
+        self.convert_time()
+    
     def convert_time(self, event=None):
         """转换时间格式"""
+        # 获取输入内容和目标格式
+        input_content = self.input_text.get(1.0, tk.END).strip()
+        target_format = self.format_var.get()
+        
+        # 清除之前的结果
+        self.output_text.delete(1.0, tk.END)
+        
+        if not input_content or not target_format:
+            return
+        
         try:
-            # 获取输入内容和目标格式
-            input_content = self.input_text.get(1.0, tk.END).strip()
-            target_format = self.format_var.get()
-            
-            # 清除之前的结果
-            self.output_text.delete(1.0, tk.END)
-            
-            if not input_content or not target_format:
-                return
-            
             # 解析时间
             dt = self.parse_time(input_content)
             if dt:
@@ -169,7 +216,10 @@ class TimeConvertApp:
                 converted_time = dt.strftime(target_format)
                 # 显示结果
                 self.output_text.insert(tk.END, converted_time)
+                # 强制更新界面，确保结果能实时显示
+                self.output_text.update_idletasks()
         except Exception as e:
+            # 简化异常处理，不显示错误信息，保持界面干净
             pass
     
     def parse_time(self, time_str):
