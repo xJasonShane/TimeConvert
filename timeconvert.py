@@ -270,19 +270,6 @@ class TimeConvertApp:
             except ValueError:
                 continue
         
-        # 尝试解析时间戳
-        try:
-            # 整数时间戳（秒）
-            timestamp = int(time_str)
-            return datetime.datetime.fromtimestamp(timestamp)
-        except ValueError:
-            try:
-                # 浮点数时间戳（秒）
-                timestamp = float(time_str)
-                return datetime.datetime.fromtimestamp(timestamp)
-            except ValueError:
-                pass
-        
         # 尝试解析带有时区的ISO格式
         try:
             return datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
@@ -299,6 +286,25 @@ class TimeConvertApp:
                     continue
         except Exception:
             pass
+        
+        # 最后尝试解析时间戳，且只对纯数字字符串进行解析
+        # 时间戳格式：纯数字，长度10位（秒）或13位（毫秒）或含小数点
+        if re.match(r'^[0-9]+(\.[0-9]+)?$', time_str):
+            # 检查长度是否合理（避免单个数字被解析）
+            # 秒级时间戳：10位左右，毫秒级：13位左右
+            str_len = len(time_str.replace('.', ''))
+            if 9 <= str_len <= 14:
+                try:
+                    # 整数时间戳（秒）
+                    timestamp = int(time_str)
+                    return datetime.datetime.fromtimestamp(timestamp)
+                except ValueError:
+                    try:
+                        # 浮点数时间戳（秒）
+                        timestamp = float(time_str)
+                        return datetime.datetime.fromtimestamp(timestamp)
+                    except ValueError:
+                        pass
         
         return None
 
